@@ -7,26 +7,30 @@ from typing import Optional, Callable
 BufferCallback = Callable[[np.ndarray], None]
 
 SAMPLE_RATE = 16000
-BLOCK_SIZE = 3200  # 200ms at 16kHz
+BLOCK_SIZE = 3200
 
 
 class AudioCapture:
-    def __init__(self, callback: Optional[BufferCallback] = None) -> None:
-        self.callback = callback
+    def __init__(self) -> None:
         self.stream: Optional[sd.InputStream] = None
-        self._device: Optional[int] = None
+        self._device: Optional[str | int] = None
+        self._buffers: list[np.ndarray] = []
+        self._recording = False
+        self.on_buffer: Optional[BufferCallback] = None
 
     @property
-    def device(self) -> Optional[int]:
+    def device(self) -> Optional[str | int]:
         return self._device
 
     @device.setter
-    def device(self, device_id: Optional[int]) -> None:
+    def device(self, device_id: Optional[str | int]) -> None:
         self._device = device_id
 
     def start(self) -> None:
         if self.stream is not None:
             return
+        self._buffers.clear()
+        self._recording = True
         self.stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
             blocksize=BLOCK_SIZE,
@@ -37,11 +41,19 @@ class AudioCapture:
         )
         self.stream.start()
 
-    def stop(self) -> None:
+    def stop(self) -> np.ndarray:
+        self._recording = False
         if self.stream is not None:
             self.stream.stop()
             self.stream.close()
             self.stream = None
+        if not self._buffers:
+            return np.zeros((0,), dtype="float32")
+        return np.concatenate(self._buffers)
+
+    @property
+    def is_recording(self) -> bool:
+        return self._recording
 
     def _audio_callback(
         self,
@@ -52,8 +64,11 @@ class AudioCapture:
     ) -> None:
         if status:
             return
-        if self.callback:
-            self.callback(indata.copy())
+        audio = indata.copy().flatten()
+        if self._recording:
+            self._buffers.append(audio)
+        if self.on_buffer:
+            self.on_buffer(audio)
 
     @staticmethod
     def list_devices() -> list[dict]:

@@ -12,6 +12,7 @@ dependencies = [
     "faster-whisper>=1.1",
     "piper-tts>=1.2",
     "httpx[sse]>=0.27",
+    "qtawesome>=1.4",
 ]
 
 [project.optional-dependencies]

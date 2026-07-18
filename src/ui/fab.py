@@ -1,26 +1,27 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QWidget, QPushButton, QVBoxLayout
+import qtawesome as qta
+from PySide6.QtWidgets import QWidget, QPushButton
 from PySide6.QtCore import Qt, QSize, Signal
-from PySide6.QtGui import QPainter, QColor, QBrush, QPen, QFont
+from PySide6.QtGui import QColor
 
 from src.pipeline.orchestrator import State
 
 
 COLORS = {
-    State.IDLE: QColor("#9E9E9E"),
-    State.RECORDING: QColor("#F44336"),
-    State.TRANSCRIBING: QColor("#FF9800"),
-    State.LLM: QColor("#2196F3"),
-    State.TTS: QColor("#4CAF50"),
+    State.IDLE: "#9E9E9E",
+    State.RECORDING: "#F44336",
+    State.TRANSCRIBING: "#FF9800",
+    State.LLM: "#2196F3",
+    State.TTS: "#4CAF50",
 }
 
 ICONS = {
-    State.IDLE: "🎤",
-    State.RECORDING: "🎤",
-    State.TRANSCRIBING: "✏️",
-    State.LLM: "🤖",
-    State.TTS: "🔊",
+    State.IDLE: "fa6s.microphone",
+    State.RECORDING: "fa6s.microphone",
+    State.TRANSCRIBING: "fa6s.pen",
+    State.LLM: "fa6s.robot",
+    State.TTS: "fa6s.volume-high",
 }
 
 FAB_SIZE = 56
@@ -48,6 +49,7 @@ class FAB(QWidget):
         self.button = QPushButton(self)
         self.button.setFixedSize(FAB_SIZE, FAB_SIZE)
         self.button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.button.setIconSize(QSize(24, 24))
         self.button.clicked.connect(self.clicked.emit)
         self._update_button()
 
@@ -63,21 +65,19 @@ class FAB(QWidget):
 
     def _update_button(self) -> None:
         color = COLORS.get(self._state, COLORS[State.IDLE])
-        icon = ICONS.get(self._state, ICONS[State.IDLE])
+        icon_name = ICONS.get(self._state, ICONS[State.IDLE])
+        icon = qta.icon(icon_name, color="#FFFFFF")
+        self.button.setIcon(icon)
         self.button.setStyleSheet(
             f"""
             QPushButton {{
-                background-color: {color.name()};
+                background-color: {color};
                 border-radius: {FAB_SIZE // 2}px;
-                font-size: 24px;
-                color: white;
             }}
             QPushButton:hover {{
-                opacity: 0.8;
+                background-color: {color}CC;
             }}
             """
         )
-        self.button.setText(icon)
 
-    def paintEvent(self, event) -> None:
-        pass
+
