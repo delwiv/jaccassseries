@@ -9,10 +9,12 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 from src.audio.capture import AudioCapture
+from src.audio.output import AudioOutput
 from src.config import Config
 from src.llm.client import LLMClient
 from src.pipeline.orchestrator import Orchestrator, State
 from src.stt.transcriber import Transcriber
+from src.tts.synthesizer import Synthesizer
 from src.ui.fab import FAB
 from src.ui.tray import SystemTray
 
@@ -66,6 +68,8 @@ class JacasseriesApp(QApplication):
             api_key=self.config.api_key,
             model=self.config.llm_model,
         )
+        self.synthesizer = Synthesizer(voice=self.config.tts_voice or "fr_FR-siwis-medium")
+        self.audio_out = AudioOutput()
         self._connect_signals()
 
     def _connect_signals(self) -> None:
@@ -80,6 +84,9 @@ class JacasseriesApp(QApplication):
         current = self.orchestrator.state
         print(f"[fab] click, state={current.name}")
         if current in (State.IDLE, State.TTS):
+            if current == State.TTS:
+                self.audio_out.stop()
+                self.synthesizer.stop()
             self.orchestrator.start_recording()
             self.audio.start()
             print("\n--- recording ---")
@@ -95,6 +102,8 @@ class JacasseriesApp(QApplication):
             )
         else:
             self.audio.stop()
+            self.audio_out.stop()
+            self.synthesizer.stop()
             self.orchestrator.interrupt()
             print("\n--- interrupted ---")
 
@@ -123,6 +132,19 @@ class JacasseriesApp(QApplication):
 
     def _on_llm_ready(self, text: str) -> None:
         print(f"\n--- done ({len(text)} chars) ---")
+        print("--- tts ---")
+        _run_in_thread(
+            lambda: self._speak(text),
+            on_done=lambda _: self.orchestrator.tts_done(),
+            on_error=lambda _: self.orchestrator.interrupt(),
+            label="tts",
+        )
+
+    def _speak(self, text: str) -> None:
+        audio = self.synthesizer.synthesize(text)
+        if len(audio) == 0:
+            return
+        self.audio_out.play(audio, samplerate=self.synthesizer.sample_rate)
 
     def run(self) -> None:
         self.fab.show()
