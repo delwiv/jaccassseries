@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import qtawesome as qta
-from PySide6.QtWidgets import QWidget, QPushButton
-from PySide6.QtCore import Qt, QSize, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QWidget, QPushButton, QMenu
+from PySide6.QtCore import Qt, QSize, Signal, QPoint
+from PySide6.QtGui import QColor, QMouseEvent
 
 from src.pipeline.orchestrator import State
 
@@ -29,10 +29,13 @@ FAB_SIZE = 56
 
 class FAB(QWidget):
     clicked = Signal()
+    config_requested = Signal()
+    quit_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__()
         self._state = State.IDLE
+        self._drag_pos: QPoint | None = None
         self._setup_window()
         self._setup_ui()
 
@@ -80,4 +83,24 @@ class FAB(QWidget):
             """
         )
 
+    def contextMenuEvent(self, event) -> None:
+        menu = QMenu(self)
+        config_action = menu.addAction("Configuration")
+        config_action.triggered.connect(self.config_requested.emit)
+        menu.addSeparator()
+        quit_action = menu.addAction("Quitter")
+        quit_action.triggered.connect(self.quit_requested.emit)
+        menu.exec(event.globalPos())
 
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if event.buttons() == Qt.MouseButton.LeftButton and self._drag_pos is not None:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self._drag_pos = None
