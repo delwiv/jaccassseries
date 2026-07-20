@@ -66,7 +66,7 @@ class Synthesizer:
         )
         print("[tts] download done")
 
-    def _load_voice(self) -> None:
+    def load_voice(self) -> None:
         if self._voice_obj is not None:
             return
         self._ensure_voice()
@@ -79,7 +79,7 @@ class Synthesizer:
         )
 
     def synthesize(self, text: str) -> np.ndarray:
-        self._load_voice()
+        self.load_voice()
         self._stopped = False
         chunks = list(self._voice_obj.synthesize(text))
         if not chunks:

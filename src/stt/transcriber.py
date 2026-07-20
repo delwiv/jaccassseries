@@ -53,7 +53,7 @@ class Transcriber:
         self.compute_type = compute_type
         self._model = None
 
-    def _load_model(self) -> None:
+    def load_model(self) -> None:
         if self._model is not None:
             return
         device = _pick_device(self.device)
@@ -69,7 +69,7 @@ class Transcriber:
         print("[stt] model loaded")
 
     def transcribe(self, audio: np.ndarray) -> str:
-        self._load_model()
+        self.load_model()
         segments, info = self._model.transcribe(
             audio,
             language=self.language,

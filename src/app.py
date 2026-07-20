@@ -111,6 +111,7 @@ class JacasseriesApp(QApplication):
         if self.config.microphone:
             self.audio.device = int(self.config.microphone)
         self.shortcut.register(self.config.keyboard_shortcut)
+        _run_in_thread(lambda: self._preload_models(), label="preload")
         print("[config] reloaded")
 
     def _on_state_change(self, state: State) -> None:
@@ -186,3 +187,10 @@ class JacasseriesApp(QApplication):
         self.fab.show()
         self.tray.show()
         self.shortcut.register(self.config.keyboard_shortcut)
+        _run_in_thread(lambda: self._preload_models(), label="preload")
+
+    def _preload_models(self) -> None:
+        print("[preload] loading models...")
+        self.transcriber.load_model()
+        self.synthesizer.load_voice()
+        print("[preload] ready")
