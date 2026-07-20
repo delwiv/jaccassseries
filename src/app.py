@@ -13,6 +13,7 @@ from src.audio.output import AudioOutput
 from src.config import Config
 from src.llm.client import LLMClient
 from src.pipeline.orchestrator import Orchestrator, State
+from src.pipeline.streamer import TTSStreamer
 from src.stt.transcriber import Transcriber
 from src.tts.synthesizer import Synthesizer
 from src.keyword.spotter import GlobalShortcut
@@ -72,6 +73,7 @@ class JacasseriesApp(QApplication):
         )
         self.synthesizer = Synthesizer(voice=self.config.tts_voice or "fr_FR-siwis-medium")
         self.audio_out = AudioOutput()
+        self.streamer = TTSStreamer(self.synthesizer, self.audio_out)
         self.shortcut = GlobalShortcut()
         self.shortcut.on_activate = self._on_shortcut
         self._connect_signals()
@@ -84,6 +86,8 @@ class JacasseriesApp(QApplication):
         self.orchestrator.on_transcription_ready = self._on_transcription_ready
         self.orchestrator.on_llm_token = self._on_llm_token
         self.orchestrator.on_llm_ready = self._on_llm_ready
+        self.streamer.on_done = self._on_tts_done
+        self.streamer.on_error = lambda e: self.orchestrator.interrupt()
         self.tray.show_requested.connect(self._toggle_visible)
         self.tray.config_requested.connect(self._open_config)
         self.tray.quit_requested.connect(self.quit)
@@ -108,6 +112,10 @@ class JacasseriesApp(QApplication):
         self.synthesizer = Synthesizer(
             voice=self.config.tts_voice or "fr_FR-siwis-medium"
         )
+        self.streamer = TTSStreamer(self.synthesizer, self.audio_out)
+        self.streamer.on_done = self._on_tts_done
+        self.streamer.on_error = lambda e: self.orchestrator.interrupt()
+        self.streamer.start()
         if self.config.microphone:
             self.audio.device = int(self.config.microphone)
         self.shortcut.register(self.config.keyboard_shortcut)
@@ -123,8 +131,7 @@ class JacasseriesApp(QApplication):
         print(f"[fab] click, state={current.name}")
         if current in (State.IDLE, State.TTS):
             if current == State.TTS:
-                self.audio_out.stop()
-                self.synthesizer.stop()
+                self.streamer.stop()
             self.orchestrator.start_recording()
             self.audio.start()
             print("\n--- recording ---")
@@ -140,8 +147,7 @@ class JacasseriesApp(QApplication):
             )
         else:
             self.audio.stop()
-            self.audio_out.stop()
-            self.synthesizer.stop()
+            self.streamer.stop()
             self.orchestrator.interrupt()
             print("\n--- interrupted ---")
 
@@ -163,22 +169,14 @@ class JacasseriesApp(QApplication):
     def _on_llm_token(self, token: str) -> None:
         if token:
             print(token, end="", flush=True)
+            self.streamer.feed_token(token)
 
     def _on_llm_ready(self, text: str) -> None:
         print(f"\n--- done ({len(text)} chars) ---")
-        print("--- tts ---")
-        _run_in_thread(
-            lambda: self._speak(text),
-            on_done=lambda _: self.orchestrator.tts_done(),
-            on_error=lambda _: self.orchestrator.interrupt(),
-            label="tts",
-        )
+        self.streamer.flush()
 
-    def _speak(self, text: str) -> None:
-        audio = self.synthesizer.synthesize(text)
-        if len(audio) == 0:
-            return
-        self.audio_out.play(audio, samplerate=self.synthesizer.sample_rate)
+    def _on_tts_done(self) -> None:
+        self.orchestrator.tts_done()
 
     def _on_shortcut(self) -> None:
         _main.invoke.emit(lambda: self._on_fab_click())
@@ -186,6 +184,7 @@ class JacasseriesApp(QApplication):
     def run(self) -> None:
         self.fab.show()
         self.tray.show()
+        self.streamer.start()
         self.shortcut.register(self.config.keyboard_shortcut)
         _run_in_thread(lambda: self._preload_models(), label="preload")
 
