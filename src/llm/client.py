@@ -5,12 +5,23 @@ from typing import Optional
 
 import httpx
 
+SYSTEM_PROMPT = (
+    "Tu es un assistant vocal. Réponds uniquement en texte brut, "
+    "sans aucun formatage markdown (pas d'astérisques, tirets, crochets, "
+    "numéros, ou autres symboles de mise en forme). "
+    "N'utilise pas d'emojis ou d'émoticônes. "
+    "Écris comme tu parles à l'oral : des phrases naturelles et fluides. "
+    "Pour les nombres, écris-les sous forme parlée si approprié. "
+    "Sois concis et va droit au but."
+)
+
 
 class LLMClient:
     def __init__(self, base_url: str = "http://localhost:8080", api_key: str = "", model: str = "") -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
+        self.system_prompt = SYSTEM_PROMPT
         self._headers = {"Content-Type": "application/json"}
         if api_key:
             self._headers["Authorization"] = f"Bearer {api_key}"
@@ -31,9 +42,11 @@ class LLMClient:
         on_token: Optional[callable] = None,
     ) -> str:
         full = ""
+        messages = [{"role": "system", "content": self.system_prompt}]
+        messages.append({"role": "user", "content": text})
         payload = {
             "model": self.model,
-            "messages": [{"role": "user", "content": text}],
+            "messages": messages,
             "stream": True,
         }
         with httpx.Client() as client:
