@@ -22,9 +22,13 @@ class LLMClient:
         self.api_key = api_key
         self.model = model
         self.system_prompt = SYSTEM_PROMPT
+        self.messages: list[dict] = []
         self._headers = {"Content-Type": "application/json"}
         if api_key:
             self._headers["Authorization"] = f"Bearer {api_key}"
+
+    def reset(self) -> None:
+        self.messages.clear()
 
     def list_models(self) -> list[str]:
         with httpx.Client() as client:
@@ -42,11 +46,13 @@ class LLMClient:
         on_token: Optional[callable] = None,
     ) -> str:
         full = ""
-        messages = [{"role": "system", "content": self.system_prompt}]
-        messages.append({"role": "user", "content": text})
+        payload_messages = [{"role": "system", "content": self.system_prompt}]
+        payload_messages.extend(self.messages)
+        payload_messages.append({"role": "user", "content": text})
+        self.messages.append({"role": "user", "content": text})
         payload = {
             "model": self.model,
-            "messages": messages,
+            "messages": payload_messages,
             "stream": True,
         }
         with httpx.Client() as client:
@@ -70,4 +76,5 @@ class LLMClient:
                         full += delta
                         if on_token:
                             on_token(delta)
+        self.messages.append({"role": "assistant", "content": full})
         return full

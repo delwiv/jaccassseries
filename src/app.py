@@ -80,7 +80,9 @@ class JacasseriesApp(QApplication):
 
     def _connect_signals(self) -> None:
         self.fab.clicked.connect(self._on_fab_click)
+        self.fab.long_pressed.connect(self._reset_discussion)
         self.fab.config_requested.connect(self._open_config)
+        self.fab.reset_requested.connect(self._reset_discussion)
         self.fab.quit_requested.connect(self.quit)
         self.orchestrator.on_state_change(self._on_state_change)
         self.orchestrator.on_transcription_ready = self._on_transcription_ready
@@ -121,6 +123,13 @@ class JacasseriesApp(QApplication):
         self.shortcut.register(self.config.keyboard_shortcut)
         _run_in_thread(lambda: self._preload_models(), label="preload")
         print("[config] reloaded")
+
+    def _reset_discussion(self) -> None:
+        self.streamer.stop()
+        self.audio.stop()
+        self.orchestrator.interrupt()
+        self.llm.reset()
+        print("\n--- nouvelle discussion ---")
 
     def _on_state_change(self, state: State) -> None:
         print(f"[orchestrator] -> {state.name}")
