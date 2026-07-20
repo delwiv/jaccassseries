@@ -90,8 +90,8 @@ class TTSStreamer:
 
             if item is None or self._stop_event.is_set():
                 if item is None and self.on_done:
-                    self._call_main(self.on_done)
-                return
+                    self.on_done()
+                continue
 
             try:
                 audio = self.synthesizer.synthesize(item)
@@ -101,10 +101,5 @@ class TTSStreamer:
                 import traceback
                 traceback.print_exc()
                 if self.on_error:
-                    self._call_main(lambda err=e: self.on_error(err))
-                return
-
-    @staticmethod
-    def _call_main(fn: callable) -> None:
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(0, fn)
+                    self.on_error(e)
+                continue

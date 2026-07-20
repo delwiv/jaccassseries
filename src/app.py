@@ -86,8 +86,8 @@ class JacasseriesApp(QApplication):
         self.orchestrator.on_transcription_ready = self._on_transcription_ready
         self.orchestrator.on_llm_token = self._on_llm_token
         self.orchestrator.on_llm_ready = self._on_llm_ready
-        self.streamer.on_done = self._on_tts_done
-        self.streamer.on_error = lambda e: self.orchestrator.interrupt()
+        self.streamer.on_done = lambda: _main.invoke.emit(self._on_tts_done)
+        self.streamer.on_error = lambda e: _main.invoke.emit(self.orchestrator.interrupt)
         self.tray.show_requested.connect(self._toggle_visible)
         self.tray.config_requested.connect(self._open_config)
         self.tray.quit_requested.connect(self.quit)
@@ -113,8 +113,8 @@ class JacasseriesApp(QApplication):
             voice=self.config.tts_voice or "fr_FR-siwis-medium"
         )
         self.streamer = TTSStreamer(self.synthesizer, self.audio_out)
-        self.streamer.on_done = self._on_tts_done
-        self.streamer.on_error = lambda e: self.orchestrator.interrupt()
+        self.streamer.on_done = lambda: _main.invoke.emit(self._on_tts_done)
+        self.streamer.on_error = lambda e: _main.invoke.emit(self.orchestrator.interrupt)
         self.streamer.start()
         if self.config.microphone:
             self.audio.device = int(self.config.microphone)
